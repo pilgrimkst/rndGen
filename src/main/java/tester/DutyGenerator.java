@@ -31,6 +31,7 @@ public class DutyGenerator {
               doRandomQuery(impl);
             } catch (Throwable t) {
               System.out.println("Exception thrown from implementation!\n" + t);
+              t.printStackTrace(System.err);
             }
             requestsMade.incrementAndGet();
           }
