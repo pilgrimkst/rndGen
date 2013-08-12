@@ -9,17 +9,21 @@ package solution.config;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
 import com.google.inject.name.Names;
-import solution.Backend;
 import solution.TestTaskImpl;
+import solution.dao.NodeDAO;
+import solution.dao.QuotasDAO;
+import solution.sync.SyncService;
+import solution.sync.SyncServiceNode;
 import tester.ITestTask;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ApplicationModule extends AbstractModule {
-    public static final int NUM_OF_APPLICATION_THREADS = Runtime.getRuntime().availableProcessors();
+    public static final int NUM_OF_APPLICATION_THREADS = Runtime.getRuntime().availableProcessors()-1;
     private final ExecutorService systemThreadPool = Executors.newFixedThreadPool(NUM_OF_APPLICATION_THREADS);
     private Properties systemSettingsProperties = new Properties();
     public ApplicationModule(){
@@ -31,10 +35,12 @@ public class ApplicationModule extends AbstractModule {
     }
 
     protected void configure() {
-//add configuration logic here
         Names.bindProperties(binder(), systemSettingsProperties);
-        bind(Backend.class).in(Singleton.class);
+        bindConstant().annotatedWith(Names.named("nodeId")).to(UUID.randomUUID().toString());
+        bind(QuotasDAO.class).in(Singleton.class);
+        bind(NodeDAO.class).in(Singleton.class);
         bind(ExecutorService.class).toInstance(systemThreadPool);
         bind(ITestTask.class).to(TestTaskImpl.class).in(Singleton.class);
+        bind(SyncService.class).to(SyncServiceNode.class).in(Singleton.class);
     }
 }

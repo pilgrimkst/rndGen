@@ -1,18 +1,14 @@
 package solution;
 
 import com.google.inject.Inject;
+import solution.sync.SyncService;
 import tester.ITestTask;
 import tester.QuotaExceededException;
 
-import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.logging.Logger;
 
 public class TestTaskImpl implements ITestTask {
     public static final int MAX_RANDOM_NUMBER = 999;
-    public static final long NEW_CLIENT_QUOTA = 10l;
     //Set counter value, that will be sent to backend once a second
     // change this variable(or pool of variables) whenever request goes
     // We need to sync state with backend (maybe before sending data to server) to avoid
@@ -46,79 +42,38 @@ public class TestTaskImpl implements ITestTask {
 //            6. Помимо интерфейса, вам передаётся приложение, совершающее запросы к вашей
 //    реализации интерфейса в 100 потоков и выводящее в консоль производительность
 //    системы за последнюю секунду.
-    @Inject
-    private final Backend backend = null;
 
     @Inject
-    private ExecutorService executorService = null;
-    @Inject
-    private Logger logger;
+    private final SyncService syncService = null;
+
     private final Random generator = new Random();
-    private final Map<Integer, Long> quotas = new ConcurrentHashMap<Integer, Long>();
 
     @Override
     public int getRandom(final int userId) throws QuotaExceededException {
-            if (getQuota(userId) > 0) {
-                synchronized (quotas){
-                    if (getQuota(userId) > 0) {
-                        addQuota(userId, -1);
-                        return generator.nextInt(MAX_RANDOM_NUMBER);
-                    }
-                }
-            }
-            syncIfNeeded(userId);
-            throw new QuotaExceededException();
-    }
-
-    private void syncIfNeeded(int userId) {
-        if(quotas.containsKey(userId)){
-            Long difference = quotas.get(userId);
-            resetQuotas(userId);
-            Long result = backend.incrQuota(userId,difference);
-            if(result<0){
-                synchronized (quotas){
-                    quotas.put(userId,quotas.get(userId));
-                }
-            }
+        if (getQuota(userId) > 0) {
+            addQuota(userId, -1);
+            return generator.nextInt(MAX_RANDOM_NUMBER);
         }
-        //To change body of created methods use File | Settings | File Templates.
-    }
-
-    private void resetQuotas(int userId) {
-        if(quotas.containsKey(userId)){
-            synchronized (quotas){
-                quotas.put(userId,0l);
-            }
-        }
+        throw new QuotaExceededException();
     }
 
     @Override
     public void addQuota(final int userId, final long quota) {
-        synchronized (quotas){
-            Long newVal = quotas.get(userId) == null ? quota : quotas.get(userId) + quota;
-            quotas.put(userId, newVal);
-        }
-        syncIfNeeded(userId);
+        syncService.addQuota(userId, quota);
     }
 
     @Override
     public long getQuota(final int userId) {
-        if (quotas.get(userId) != null) {
-            synchronized (quotas){
-                return quotas.get(userId);
-            }
-        } else {
-            addQuota(userId, NEW_CLIENT_QUOTA);
-            return getQuota(userId);
-        }
+        return syncService.getQuota(userId);
     }
 
     @Override
     public void destroy() {
+        syncService.persistLocalChanges();
     }
 
     @Override
     public void clearAll() {
-    }
-
+        syncService.cleanUpUserQuotas();
+    }   
 }
