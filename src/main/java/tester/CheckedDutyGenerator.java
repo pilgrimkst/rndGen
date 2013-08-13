@@ -7,8 +7,8 @@ import java.util.concurrent.ConcurrentMap;
 
 public class CheckedDutyGenerator extends DutyGenerator {
     private final ConcurrentMap<Integer, RequestsHolder> userStatistics;
-
-    public CheckedDutyGenerator(ConcurrentMap<Integer, RequestsHolder> userStatistics) {
+    public CheckedDutyGenerator(ConcurrentMap<Integer, RequestsHolder> userStatistics, long waitBeforeSigTerm) {
+        super(waitBeforeSigTerm);
         this.userStatistics = userStatistics;
     }
 

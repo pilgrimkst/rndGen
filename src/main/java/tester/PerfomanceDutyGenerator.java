@@ -1,6 +1,10 @@
 package tester;
 
 public class PerfomanceDutyGenerator extends DutyGenerator {
+    public PerfomanceDutyGenerator() {
+        super(-1);
+    }
+
     @Override
     protected void doRandomQuery(ITestTask impl) {
         Integer userID = getRandomUserId();

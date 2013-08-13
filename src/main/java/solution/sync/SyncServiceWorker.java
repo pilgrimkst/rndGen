@@ -69,6 +69,13 @@ public class SyncServiceWorker {
         return serviceStarted;
     }
 
+    public void stopService(){
+        serviceStarted=false;
+        for(Quota q:stats){
+            forceSync(q);
+        }
+    }
+
     public void forceSync(Quota event) {
         if (event != null) {
             syncDataWithServer(event);

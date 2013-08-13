@@ -3,7 +3,6 @@ package solution.sync;
 import com.google.inject.Inject;
 import solution.dao.QuotasDAO;
 
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -25,6 +24,8 @@ public class SyncServiceNode implements SyncService {
 
     @Inject
     private final SyncServiceWorker syncServiceWorker = null;
+
+    private volatile boolean sigTerm=false;
 
     private long syncQuotaFor(Integer userId, long quotaChangeValue) {
         return quotasDAO.incrQuota(userId, quotaChangeValue);
@@ -50,16 +51,20 @@ public class SyncServiceNode implements SyncService {
     }
 
     private void notifySyncService(Quota event) {
-        if (!syncServiceWorker.isServiceStarted()) {
-            syncServiceWorker.setStats(stats);
-            syncServiceWorker.startService();
-        }
-
         try {
-            if (syncImmidiate(event)) {
-                syncServiceWorker.syncDataWithServer(event);
-            } else if (deferredSyncRequired(event)) {
-                stats.put(event);
+            if(!sigTerm){
+                if (!syncServiceWorker.isServiceStarted()) {
+                    syncServiceWorker.setStats(stats);
+                    syncServiceWorker.startService();
+                }
+
+                if (syncImmidiate(event)) {
+                    syncServiceWorker.syncDataWithServer(event);
+                } else if (deferredSyncRequired(event)) {
+                    stats.put(event);
+                }
+            }else {
+                logger.info(String.format("Update signal received after termination request, this request won't be processed"));
             }
         } catch (InterruptedException e) {
             syncServiceWorker.forceSync(event);
@@ -77,11 +82,8 @@ public class SyncServiceNode implements SyncService {
 
     @Override
     public boolean persistLocalChanges() {
-        for (Map.Entry<Integer, Quota> entry : quotas.entrySet()) {
-            if (entry.getValue().localChanges.get() != 0) {
-                syncQuotaFor(entry.getKey(), entry.getValue().localChanges.get());
-            }
-        }
+        sigTerm = true;
+        syncServiceWorker.stopService();
         return true;
     }
 
