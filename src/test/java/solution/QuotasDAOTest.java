@@ -1,7 +1,7 @@
 package solution;
 
 import com.google.inject.Inject;
-import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import solution.dao.QuotasDAO;
 
@@ -14,6 +14,11 @@ public class QuotasDAOTest extends BasicTest{
     @Inject private final QuotasDAO backend = null;
 
     private static List<Integer> testUserIds = Arrays.asList(1, 2, 3, 4, 5, 6);
+
+    @Before
+    public void cleanUp() {
+        clearStorage();
+    }
 
     @Test
     public void getQuotaShouldGetLongValueForExistentUser() throws Exception {
@@ -70,13 +75,6 @@ public class QuotasDAOTest extends BasicTest{
         backend.remove(testUserIds.get(5));
         Long nullResult = backend.getQuota(testUserIds.get(5));
         assertThat(nullResult).isNull();
-    }
-
-    @After
-    public void cleanUp() {
-        for (Integer id : testUserIds) {
-            backend.remove(id);
-        }
     }
 
 }

@@ -1,35 +1,30 @@
 package solution.sync;
 
 import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import solution.dao.QuotasDAO;
 
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Logger;
 
 public class SyncServiceNode implements SyncService {
     public static final long NEW_CLIENT_QUOTA = 10l;
-    public static final double SYNC_TRESHOLD = NEW_CLIENT_QUOTA * 0.1;
-    private final ConcurrentMap<Integer, AtomicLong> localQuotas = new ConcurrentHashMap<Integer, AtomicLong>();
-    private final ConcurrentMap<Integer, AtomicLong> localQuotaChanges = new ConcurrentHashMap<Integer, AtomicLong>();
-    private final ConcurrentMap<Integer, AtomicLong> quotasAccessLog = new ConcurrentHashMap<Integer, AtomicLong>();
-    private final BlockingQueue<QuotaStatsEntity> stats = new PriorityBlockingQueue<QuotaStatsEntity>();
-    private volatile boolean serviceStarted = false;
-
+    public static final int AVERAGE_CLIENTS_PER_NODE = 5000;
+    public static final int AVERAGE_THREADS_PER_NODE = 10;
+    private final ConcurrentMap<Integer, Quota> quotas = new ConcurrentHashMap<Integer, Quota>(AVERAGE_CLIENTS_PER_NODE, 0.75f, AVERAGE_THREADS_PER_NODE);
+    private final BlockingQueue<Quota> stats = new LinkedBlockingQueue<Quota>(5000);
+    private static final long LOW_QUOTA_SYNC_LIMIT = 100;
     @Inject
-    private ExecutorService executorService = null;
-
-    @Inject
-    @Named("nodeId")
-    private final String nodeId = null;
+    private Logger logger;
 
     @Inject
     protected final QuotasDAO quotasDAO = null;
+
+    @Inject
+    private final SyncServiceWorker syncServiceWorker = null;
 
     private long syncQuotaFor(Integer userId, long quotaChangeValue) {
         return quotasDAO.incrQuota(userId, quotaChangeValue);
@@ -37,70 +32,54 @@ public class SyncServiceNode implements SyncService {
 
     @Override
     public Long getQuota(Integer userId) {
-        return getQuotaInner(userId).get();
+        Quota q = getQuotaInner(userId);
+        notifySyncService(q);
+        return calculateQuota(q);
+    }
+
+    private long calculateQuota(Quota q) {
+        return q.quota.get() + q.localChanges.get();
     }
 
     @Override
     public void addQuota(Integer userId, Long quota) {
-        getQuotaInner(userId).addAndGet(quota);
-        QuotaStatsEntity event = updateLocalChanges(userId, quota);
+        Quota event = getQuotaInner(userId);
+        event.localChanges.addAndGet(quota);
+        event.accessCounter.incrementAndGet();
         notifySyncService(event);
     }
 
-    private void notifySyncService(QuotaStatsEntity event) {
-        if (!serviceStarted) {
-            serviceStarted=true;
-            Runnable r = new Runnable() {
-                @Override
-                public void run() {
-                    while (serviceStarted){
-                        QuotaStatsEntity entity = stats.poll();
-                        AtomicLong changes = entity.localChanges;
-                        AtomicLong quota = localQuotas.get(entity.userId);
-                        long serverQuota = quotasDAO.incrQuota(entity.userId, changes.getAndSet(0));
-                        if(serverQuota<0){
-                            quotasDAO.setQuota(entity.userId,0l);
-                            serverQuota = 0l;
-                        }
-                        quota.set(serverQuota);
-                    }
-                }
-            };
-            executorService.submit(r);
+    private void notifySyncService(Quota event) {
+        if (!syncServiceWorker.isServiceStarted()) {
+            syncServiceWorker.setStats(stats);
+            syncServiceWorker.startService();
         }
 
         try {
-            stats.put(event);
-            localQuotaChanges.get(event.userId).set(0);
+            if (syncImmidiate(event)) {
+                syncServiceWorker.syncDataWithServer(event);
+            } else if (deferredSyncRequired(event)) {
+                stats.put(event);
+            }
         } catch (InterruptedException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+            syncServiceWorker.forceSync(event);
         }
     }
 
-    private QuotaStatsEntity updateLocalChanges(Integer userId, Long quota) {
-        AtomicLong changesSinceLastUpdate = localQuotaChanges.get(userId);
-        AtomicLong counter = quotasAccessLog.get(userId);
-
-        if (counter == null) {
-            quotasAccessLog.putIfAbsent(userId, new AtomicLong(1));
-        } else {
-            quotasAccessLog.get(userId).incrementAndGet();
-        }
-
-        if (changesSinceLastUpdate == null) {
-            localQuotaChanges.putIfAbsent(userId, new AtomicLong(quota));
-        } else {
-            changesSinceLastUpdate.addAndGet(quota);
-        }
-
-        return new QuotaStatsEntity(userId, quotasAccessLog.get(userId).get(), localQuotaChanges.get(userId));
+    private boolean deferredSyncRequired(Quota event) {
+        return !stats.contains(event);
     }
+
+    private boolean syncImmidiate(Quota event) {
+        return calculateQuota(event) < LOW_QUOTA_SYNC_LIMIT;
+    }
+
 
     @Override
     public boolean persistLocalChanges() {
-        for (Map.Entry<Integer, AtomicLong> entry : localQuotas.entrySet()) {
-            if (entry.getValue().get() != 0) {
-                syncQuotaFor(entry.getKey(), entry.getValue().get());
+        for (Map.Entry<Integer, Quota> entry : quotas.entrySet()) {
+            if (entry.getValue().localChanges.get() != 0) {
+                syncQuotaFor(entry.getKey(), entry.getValue().localChanges.get());
             }
         }
         return true;
@@ -109,50 +88,27 @@ public class SyncServiceNode implements SyncService {
     @Override
     public void cleanUpUserQuotas() {
         quotasDAO.clearUserQuotas();
+        quotas.clear();
+        stats.clear();
     }
 
-    private AtomicLong getQuotaInner(Integer userId) {
-        AtomicLong value = localQuotas.get(userId);
-        if (value != null) {
-            return value;
-        } else {
-            Long quotaFromServer = quotasDAO.getQuota(userId);
-            localQuotas.putIfAbsent(userId, new AtomicLong(quotaFromServer == null ? NEW_CLIENT_QUOTA : quotaFromServer));
-            return getQuotaInner(userId);
+    private Quota getQuotaInner(Integer userId) {
+        Quota value = quotas.get(userId);
+        while (value == null) {
+            Quota newQuota = new Quota(userId);
+            Long quotaFromServer = quotasDAO.getQuota(newQuota.userId);
+            if (quotaFromServer != null) {
+                newQuota.quota.set(quotaFromServer);
+                newQuota.localChanges.set(0);
+            } else {
+                newQuota.localChanges.set(NEW_CLIENT_QUOTA);
+            }
+            newQuota.accessCounter.set(0);
+            quotas.putIfAbsent(userId, newQuota);
+            value = quotas.get(userId);
         }
+        return value;
     }
 
-    private class QuotaStatsEntity implements Comparable<QuotaStatsEntity> {
-        final Integer userId;
-        final long stats;
-        final AtomicLong localChanges;
 
-        private QuotaStatsEntity(Integer userId, long stats, AtomicLong localChanges) {
-            this.stats = stats;
-            this.userId = userId;
-            this.localChanges = localChanges;
-        }
-
-        @Override
-        public int compareTo(QuotaStatsEntity o) {
-            return stats > 0 ? 1 : stats < 0 ? -1 : 0;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof QuotaStatsEntity)) return false;
-
-            QuotaStatsEntity that = (QuotaStatsEntity) o;
-
-            if (!userId.equals(that.userId)) return false;
-
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            return userId.hashCode();
-        }
-    }
 }

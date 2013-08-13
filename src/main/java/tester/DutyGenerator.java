@@ -4,9 +4,9 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class DutyGenerator {
+public abstract class DutyGenerator {
 
-  private static final Random R = new Random();
+  protected static final Random R = new Random();
 
   public static final int TEST_TIME_IN_MS = 20000;
   public static final int THREADS_COUNT = 100;
@@ -14,7 +14,7 @@ public class DutyGenerator {
   private final AtomicLong requestsMade = new AtomicLong(0);
   private final List<Thread> runningThreads = new ArrayList<Thread>();
 
-  public void generateDuty(final ITestTask impl) throws InterruptedException {
+  public void generateDuty(final List<ITestTask> impl) throws InterruptedException {
     final long startTime = System.currentTimeMillis();
     System.out.println("Started at: " + startTime);
 
@@ -26,9 +26,8 @@ public class DutyGenerator {
             if (System.currentTimeMillis() >= startTime + TEST_TIME_IN_MS) {
               break;
             }
-
             try {
-              doRandomQuery(impl);
+              doRandomQuery(getRandomNode(impl));
             } catch (Throwable t) {
               System.out.println("Exception thrown from implementation!\n" + t);
               t.printStackTrace(System.err);
@@ -48,16 +47,15 @@ public class DutyGenerator {
     System.out.println("Requests made: " + requestsMade + " (" + (requestsMade.get() * 1.0 / TEST_TIME_IN_MS) + " per second)");
   }
 
-  private void doRandomQuery(ITestTask impl) {
-    if (R.nextInt(10) == 0) {
-      impl.addQuota(getRandomUserId(), 10);
-    } else {
-      try {
-        impl.getRandom(getRandomUserId());
-      } catch (QuotaExceededException ignored) {
-      }
+    private ITestTask getRandomNode(List<ITestTask> impl) {
+        if(impl==null||impl.size()<1)
+            throw new IllegalStateException();
+        if(impl.size()==1)
+            return impl.get(0);
+        return impl.get(R.nextInt(impl.size()));
     }
-  }
+
+    protected abstract void doRandomQuery(ITestTask impl);
 
   public int getRandomUserId() {
     int r = R.nextInt(100);
