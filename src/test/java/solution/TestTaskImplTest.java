@@ -2,6 +2,7 @@ package solution;
 
 
 import com.google.inject.Guice;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -35,7 +36,7 @@ public class TestTaskImplTest extends BasicTest{
     @Inject
     private QuotasDAO quotasDAO;
 
-    @Inject private final ITestTask iTestTask = null;
+    @Inject private ITestTask iTestTask;
 
     private final List<Integer> createdUserQuotas = new CopyOnWriteArrayList<Integer>();
 
@@ -44,6 +45,10 @@ public class TestTaskImplTest extends BasicTest{
         clearStorage();
     }
 
+    @After
+    public void tearDown(){
+        clearStorage();
+    }
     @Test
     public void getRandomShouldReturnNonNegativeNumberForUserWithQuota() throws Exception {
         int userId = 1;
@@ -119,7 +124,8 @@ public class TestTaskImplTest extends BasicTest{
     public void testPerformance() throws InterruptedException {
         DutyGenerator dutyGenerator = new PerfomanceDutyGenerator();
         ITestTask impl = ApplicationContext.getInstance().getInstance(ITestTask.class);
-        dutyGenerator.generateDuty(Arrays.asList(impl));
+        double[] statistics = dutyGenerator.generateDuty(Arrays.asList(impl));
+        logger.info(String.format("Performance is: requests{%f} requests per second: {%f}",statistics[0],statistics[1]));
         Map<Integer, Long> result = quotasDAO.getAllQuotas();
         checkResults(result);
     }
@@ -130,9 +136,10 @@ public class TestTaskImplTest extends BasicTest{
         CheckedDutyGenerator dutyGenerator = new CheckedDutyGenerator(userStatistics);
         ITestTask impl1 = getNewInstance();
         ITestTask impl2 = getNewInstance();
-        dutyGenerator.generateDuty(Arrays.asList(impl1, impl2));
+        double[] statistics = dutyGenerator.generateDuty(Arrays.asList(impl1, impl2));
         Map<Integer, RequestsHolder> estimatedResult = dutyGenerator.getResults();
         Thread.sleep(WAIT_TO_SYNC);
+        logger.info(String.format("Performance is: requests{%f} requests per second: {%f}",statistics[0],statistics[1]));
         Map<Integer, Long> result = quotasDAO.getAllQuotas();
         checkResults(result);
         assertResultsSame(result, estimatedResult);
@@ -144,13 +151,17 @@ public class TestTaskImplTest extends BasicTest{
 
     private void assertResultsSame(Map<Integer, Long> result, Map<Integer, RequestsHolder> estimatedResult) {
         assertThat(result.size()).isEqualTo(estimatedResult.size());
+        logger.info(String.format("Size of storage {%d} estimated size is: {%d}",result.keySet().size(),estimatedResult.keySet().size()));
+        long difference = 0;
         for (Integer userId : estimatedResult.keySet()) {
             Long quotaFromDatabase = result.get(userId);
             RequestsHolder estimatedTestResult = estimatedResult.get(userId);
             assertThat(quotaFromDatabase).isNotNull();
             assertThat(estimatedTestResult).isNotNull();
+            difference +=estimatedTestResult.getQuota().get() - quotaFromDatabase;
             assertThat(estimatedTestResult.getQuota().get() - quotaFromDatabase).isLessThan(CORRECTNESS_TRESHOLD);
         }
+        logger.info(String.format("Total difference amount: {%d}",difference));
     }
 
     private void checkResults(Map<Integer, Long> result) {

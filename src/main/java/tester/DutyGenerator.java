@@ -14,7 +14,7 @@ public abstract class DutyGenerator {
   private final AtomicLong requestsMade = new AtomicLong(0);
   private final List<Thread> runningThreads = new ArrayList<Thread>();
 
-  public void generateDuty(final List<ITestTask> impl) throws InterruptedException {
+  public double[] generateDuty(final List<ITestTask> impl) throws InterruptedException {
     final long startTime = System.currentTimeMillis();
     System.out.println("Started at: " + startTime);
 
@@ -43,8 +43,7 @@ public abstract class DutyGenerator {
     for (Thread t : runningThreads) {
       t.join();
     }
-
-    System.out.println("Requests made: " + requestsMade + " (" + (requestsMade.get() * 1.0 / TEST_TIME_IN_MS) + " per second)");
+      return new double[]{requestsMade.get(),requestsMade.get() * 1.0 / TEST_TIME_IN_MS};
   }
 
     private ITestTask getRandomNode(List<ITestTask> impl) {
