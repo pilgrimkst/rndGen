@@ -23,7 +23,7 @@ import static org.fest.assertions.api.Assertions.assertThat;
 
 public class IntegrationTest extends BasicTest{
     public static final int CORRECTNESS_TRESHOLD = 5;
-    public static final int WAIT_TO_SYNC = 3000;
+    public static final int WAIT_TO_SYNC = 5000;
     public static final int WAIT_BEFORE_SIG_TERM = 5000;
 
     @Inject
@@ -46,9 +46,10 @@ public class IntegrationTest extends BasicTest{
         DutyGenerator dutyGenerator = new PerfomanceDutyGenerator();
         ITestTask impl = ApplicationContext.getInstance().getInstance(ITestTask.class);
         double[] statistics = dutyGenerator.generateDuty(Arrays.asList(impl));
-        logger.info(String.format("Performance is: requests{%f} requests per second: {%f}",statistics[0],statistics[1]));
         Map<Integer, Long> result = quotasDAO.getAllQuotas();
         checkResults(result);
+        Thread.sleep(WAIT_TO_SYNC);
+        logger.info(String.format("Performance is: requests{%f} requests per second: {%f}",statistics[0],statistics[1]));
     }
 
     @Test
@@ -74,10 +75,9 @@ public class IntegrationTest extends BasicTest{
         ITestTask impl1 = getNewInstance();
         double[] statistics = dutyGenerator.generateDuty(Arrays.asList(impl1));
         Map<Integer, RequestsHolder> estimatedResult = dutyGenerator.getResults();
-        Thread.sleep(WAIT_TO_SYNC);
         logger.info(String.format("Performance is: requests{%f} requests per second: {%f}",statistics[0],statistics[1]));
+        Thread.sleep(WAIT_TO_SYNC);
         Map<Integer, Long> result = quotasDAO.getAllQuotas();
-        checkResults(result);
         assertResultsSame(result, estimatedResult);
     }
 

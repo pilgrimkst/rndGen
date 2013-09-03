@@ -3,19 +3,17 @@ package solution.sync;
 import com.google.inject.Inject;
 import solution.dao.QuotasDAO;
 
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
 
-public class SyncServiceNode implements SyncService {
+public class SyncServiceNode {
     public static final long NEW_CLIENT_QUOTA = 10l;
     public static final int AVERAGE_CLIENTS_PER_NODE = 5000;
-    public static final int AVERAGE_THREADS_PER_NODE = 10;
+    public static final int AVERAGE_THREADS_PER_NODE = 2;
     private final ConcurrentMap<Integer, Quota> quotas = new ConcurrentHashMap<Integer, Quota>(AVERAGE_CLIENTS_PER_NODE, 0.75f, AVERAGE_THREADS_PER_NODE);
-    private final BlockingQueue<Quota> stats = new LinkedBlockingQueue<Quota>(5000);
-    private static final long LOW_QUOTA_SYNC_LIMIT = 100;
+    private static final long QUOTA_THESHOLD = 100;
+
     @Inject
     private Logger logger;
 
@@ -25,91 +23,42 @@ public class SyncServiceNode implements SyncService {
     @Inject
     private final SyncServiceWorker syncServiceWorker = null;
 
-    private volatile boolean sigTerm=false;
-
-    private long syncQuotaFor(Integer userId, long quotaChangeValue) {
-        return quotasDAO.incrQuota(userId, quotaChangeValue);
-    }
-
-    @Override
-    public Long getQuota(Integer userId) {
+    public long getQuota(Integer userId) {
         Quota q = getQuotaInner(userId);
-        notifySyncService(q);
-        return calculateQuota(q);
+        return q.getQuota();
     }
 
-    private long calculateQuota(Quota q) {
-        return q.quota.get() + q.localChanges.get();
-    }
-
-    @Override
-    public void addQuota(Integer userId, Long quota) {
+    public void addQuota(Integer userId, long quota) {
         Quota event = getQuotaInner(userId);
-        event.localChanges.addAndGet(quota);
-        event.accessCounter.incrementAndGet();
-        notifySyncService(event);
-    }
-
-    private void notifySyncService(Quota event) {
-        try {
-            if(!sigTerm){
-                if (!syncServiceWorker.isServiceStarted()) {
-                    syncServiceWorker.setStats(stats);
-                    syncServiceWorker.startService();
-                }
-
-                if (syncImmidiate(event)) {
-                    syncServiceWorker.syncDataWithServer(event);
-                } else if (deferredSyncRequired(event)) {
-                    stats.put(event);
-                }
-            }else {
-                logger.info(String.format("Update signal received after termination request, this request won't be processed"));
-            }
-        } catch (InterruptedException e) {
-            syncServiceWorker.forceSync(event);
+        event.incrementQuota(quota);
+        if(event.getQuota()<QUOTA_THESHOLD){
+            syncServiceWorker.querySyncQuota(event);
         }
     }
 
-    private boolean deferredSyncRequired(Quota event) {
-        return !stats.contains(event);
-    }
-
-    private boolean syncImmidiate(Quota event) {
-        return calculateQuota(event) < LOW_QUOTA_SYNC_LIMIT;
-    }
-
-
-    @Override
     public boolean persistLocalChanges() {
-        sigTerm = true;
         syncServiceWorker.stopService();
+        quotas.clear();
         return true;
     }
 
-    @Override
     public void cleanUpUserQuotas() {
         quotasDAO.clearUserQuotas();
         quotas.clear();
-        stats.clear();
     }
 
     private Quota getQuotaInner(Integer userId) {
-        Quota value = quotas.get(userId);
-        while (value == null) {
-            Quota newQuota = new Quota(userId);
-            Long quotaFromServer = quotasDAO.getQuota(newQuota.userId);
-            if (quotaFromServer != null) {
-                newQuota.quota.set(quotaFromServer);
-                newQuota.localChanges.set(0);
-            } else {
-                newQuota.localChanges.set(NEW_CLIENT_QUOTA);
+        for(;;) {
+            Quota value = quotas.get(userId);
+            if(value==null){
+                Long quotaFromServer = quotasDAO.getQuota(userId);
+                long quota = quotaFromServer != null ? quotaFromServer : NEW_CLIENT_QUOTA;
+                Quota newQuota = new Quota(userId, quota);
+                quotas.putIfAbsent(userId, newQuota);
+            }else{
+                return value;
             }
-            newQuota.accessCounter.set(0);
-            quotas.putIfAbsent(userId, newQuota);
-            value = quotas.get(userId);
         }
-        return value;
     }
 
 

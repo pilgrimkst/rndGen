@@ -3,6 +3,7 @@ package solution.dao;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +23,9 @@ public class QuotasDAO extends BaseDAO {
     }
 
     public long incrQuota(Integer userId, long quota) {
-        long newVal = connection.incrby(getUserQuotaKey(userId), quota);
-//        logger.info(String.format("adding %d to user %d new quotaValue is %d", quota, userId, newVal));
-        return newVal;
+        //        long newVal = connection.incrby(getUserQuotaKey(userId), quota);
+        //        logger.info(String.format("adding %d to user %d new quotaValue is %d", quota, userId, newVal));
+        return Long.parseLong(connection.get(getUserQuotaKey(userId)));
     }
 
     public Future<Long> incrQuotaAsync(Integer userId, long quota) {
@@ -79,6 +80,41 @@ public class QuotasDAO extends BaseDAO {
 
     public void setQuota(Integer userId, long quota) {
         connection.set(getUserQuotaKey(userId), String.valueOf(quota));
+    }
+
+    public List<Long> get(List<Integer> ids) {
+        String[] chunk = new String[ids.size()];
+        int index = 0;
+        for (Integer id : ids) {
+            chunk[index] = getUserQuotaKey(id);
+        }
+        List<String> result = connection.mget(chunk);
+        return mapStringToLong(result);
+    }
+
+    public void deferredSave(Map<Integer,Long> changesFromNode){
+        Map<String,String> changes = toMapOfString(changesFromNode);
+        connectionAsync.mset(changes);
+    }
+
+    public void deferredSync(List<Integer> ids, String nodeId){
+
+    }
+
+    private Map<String, String> toMapOfString(Map<Integer, Long> changesFromNode) {
+        Map<String,String> mapped = new HashMap<String, String>(changesFromNode.size());
+        for(Integer key:changesFromNode.keySet()){
+            mapped.put(String.valueOf(key),String.valueOf(changesFromNode.get(key)));
+        }
+        return mapped;
+    }
+
+    private List<Long> mapStringToLong(List<String> valuesFromDatabase) {
+        List<Long> result = new ArrayList<Long>(valuesFromDatabase.size());
+        for (String s : valuesFromDatabase) {
+            result.add(Long.parseLong(s));
+        }
+        return result;
     }
 
     public interface CallbackLong {

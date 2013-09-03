@@ -12,7 +12,6 @@ import com.google.inject.name.Names;
 import solution.TestTaskImpl;
 import solution.dao.NodeDAO;
 import solution.dao.QuotasDAO;
-import solution.sync.SyncService;
 import solution.sync.SyncServiceNode;
 import tester.ITestTask;
 
@@ -41,6 +40,6 @@ public class ApplicationModule extends AbstractModule {
         bind(NodeDAO.class).in(Singleton.class);
         bind(ExecutorService.class).toInstance(systemThreadPool);
         bind(ITestTask.class).to(TestTaskImpl.class).in(Singleton.class);
-        bind(SyncService.class).to(SyncServiceNode.class).in(Singleton.class);
+        bind(SyncServiceNode.class).in(Singleton.class);
     }
 }

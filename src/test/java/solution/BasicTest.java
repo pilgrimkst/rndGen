@@ -23,4 +23,16 @@ public class BasicTest {
         b.clearUserQuotas();
         logger.fine("Finished clearing storage...");
     }
+
+    private volatile long methodStartTime;
+
+    protected void startLogTime(){
+        methodStartTime = System.currentTimeMillis();
+    }
+
+    protected long getExecutionTime(){
+        long result = System.currentTimeMillis() - methodStartTime;
+        methodStartTime = 0;
+        return result;
+    }
 }

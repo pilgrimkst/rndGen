@@ -1,7 +1,7 @@
 package solution;
 
 import com.google.inject.Inject;
-import solution.sync.SyncService;
+import solution.sync.SyncServiceNode;
 import tester.ITestTask;
 import tester.QuotaExceededException;
 
@@ -9,15 +9,9 @@ import java.util.Random;
 
 public class TestTaskImpl implements ITestTask {
     public static final int MAX_RANDOM_NUMBER = 999;
-    //Set counter value, that will be sent to backend once a second
-    // change this variable(or pool of variables) whenever request goes
-    // We need to sync state with backend (maybe before sending data to server) to avoid
-    // unconsistent data if some other node will change data
-    // need to implement fast and simple way to notify nodes for exceeding limits
-
 
     @Inject
-    private final SyncService syncService = null;
+    private final SyncServiceNode syncService = null;
 
     private final Random generator = new Random();
 
