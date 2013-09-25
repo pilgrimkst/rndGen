@@ -29,7 +29,7 @@ public interface ITestTask {
     void addQuota(int userId, long quota);
 
     /***
-     * Также должен поддерживаться метод getQuota(int userId), выдающий остаток
+     * Также должен поддерживаться метод get(int userId), выдающий остаток
      * квоты у данного клиента (должен возвращать 10 для новых клиентов).
      * @param userId
      * @return

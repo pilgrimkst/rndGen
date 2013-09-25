@@ -10,7 +10,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
 import com.google.inject.name.Names;
 import solution.TestTaskImpl;
-import solution.dao.NodeDAO;
 import solution.dao.QuotasDAO;
 import solution.sync.SyncServiceNode;
 import tester.ITestTask;
@@ -37,7 +36,6 @@ public class ApplicationModule extends AbstractModule {
         Names.bindProperties(binder(), systemSettingsProperties);
         bindConstant().annotatedWith(Names.named("nodeId")).to(UUID.randomUUID().toString());
         bind(QuotasDAO.class).in(Singleton.class);
-        bind(NodeDAO.class).in(Singleton.class);
         bind(ExecutorService.class).toInstance(systemThreadPool);
         bind(ITestTask.class).to(TestTaskImpl.class).in(Singleton.class);
         bind(SyncServiceNode.class).in(Singleton.class);

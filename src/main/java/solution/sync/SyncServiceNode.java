@@ -25,13 +25,13 @@ public class SyncServiceNode {
 
     public long getQuota(Integer userId) {
         Quota q = getQuotaInner(userId);
-        return q.getQuota();
+        return q.get();
     }
 
     public void addQuota(Integer userId, long quota) {
         Quota event = getQuotaInner(userId);
         event.incrementQuota(quota);
-        if(event.getQuota()<QUOTA_THESHOLD){
+        if(event.get()<QUOTA_THESHOLD){
             syncServiceWorker.querySyncQuota(event);
         }
     }

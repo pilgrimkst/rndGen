@@ -2,6 +2,7 @@ package solution.dao;
 
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
+import solution.sync.Quota;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -78,35 +79,15 @@ public class QuotasDAO extends BaseDAO {
         return String.format(USER_QUOTAS, userId);
     }
 
-    public void setQuota(Integer userId, long quota) {
-        connection.set(getUserQuotaKey(userId), String.valueOf(quota));
-    }
-
-    public List<Long> get(List<Integer> ids) {
+    public List<Long> get(List<Quota> ids) {
+        List<Integer> idList = mapQuotasToUserIds(ids);
         String[] chunk = new String[ids.size()];
         int index = 0;
-        for (Integer id : ids) {
+        for (Integer id : idList) {
             chunk[index] = getUserQuotaKey(id);
         }
         List<String> result = connection.mget(chunk);
         return mapStringToLong(result);
-    }
-
-    public void deferredSave(Map<Integer,Long> changesFromNode){
-        Map<String,String> changes = toMapOfString(changesFromNode);
-        connectionAsync.mset(changes);
-    }
-
-    public void deferredSync(List<Integer> ids, String nodeId){
-
-    }
-
-    private Map<String, String> toMapOfString(Map<Integer, Long> changesFromNode) {
-        Map<String,String> mapped = new HashMap<String, String>(changesFromNode.size());
-        for(Integer key:changesFromNode.keySet()){
-            mapped.put(String.valueOf(key),String.valueOf(changesFromNode.get(key)));
-        }
-        return mapped;
     }
 
     private List<Long> mapStringToLong(List<String> valuesFromDatabase) {
@@ -117,7 +98,11 @@ public class QuotasDAO extends BaseDAO {
         return result;
     }
 
-    public interface CallbackLong {
-        void apply(long l);
+    private List<Integer> mapQuotasToUserIds(List<Quota> entitySet) {
+        List<Integer> userIDs = new ArrayList<Integer>(entitySet.size());
+        for (Quota q : entitySet) {
+            userIDs.add(q.userId);
+        }
+        return userIDs;
     }
 }
