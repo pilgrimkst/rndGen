@@ -10,7 +10,7 @@ public abstract class DutyGenerator {
     protected static final Random R = new Random();
 
     public static final int TEST_TIME_IN_MS = 20000;
-    public static final int THREADS_COUNT = 100;
+    public static final int THREADS_COUNT = 10;
 
     private final AtomicLong requestsMade = new AtomicLong(0);
     private final List<Thread> runningThreads = new ArrayList<Thread>();

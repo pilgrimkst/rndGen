@@ -2,7 +2,6 @@ package solution.dao;
 
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
-import solution.sync.Quota;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -79,16 +78,16 @@ public class QuotasDAO extends BaseDAO {
         return String.format(USER_QUOTAS, userId);
     }
 
-    public List<Long> get(List<Quota> ids) {
-        List<Integer> idList = mapQuotasToUserIds(ids);
-        String[] chunk = new String[ids.size()];
-        int index = 0;
-        for (Integer id : idList) {
-            chunk[index] = getUserQuotaKey(id);
-        }
-        List<String> result = connection.mget(chunk);
-        return mapStringToLong(result);
-    }
+//    public List<Long> get(List<Quota> ids) {
+//        List<Integer> idList = mapQuotasToUserIds(ids);
+//        String[] chunk = new String[ids.size()];
+//        int index = 0;
+//        for (Integer id : idList) {
+//            chunk[index] = getUserQuotaKey(id);
+//        }
+//        List<String> result = connection.mget(chunk);
+//        return mapStringToLong(result);
+//    }
 
     private List<Long> mapStringToLong(List<String> valuesFromDatabase) {
         List<Long> result = new ArrayList<Long>(valuesFromDatabase.size());
@@ -98,11 +97,11 @@ public class QuotasDAO extends BaseDAO {
         return result;
     }
 
-    private List<Integer> mapQuotasToUserIds(List<Quota> entitySet) {
-        List<Integer> userIDs = new ArrayList<Integer>(entitySet.size());
-        for (Quota q : entitySet) {
-            userIDs.add(q.userId);
-        }
-        return userIDs;
-    }
+//    private List<Integer> mapQuotasToUserIds(List<Quota> entitySet) {
+//        List<Integer> userIDs = new ArrayList<Integer>(entitySet.size());
+//        for (Quota q : entitySet) {
+//            userIDs.add(q.);
+//        }
+//        return userIDs;
+//    }
 }

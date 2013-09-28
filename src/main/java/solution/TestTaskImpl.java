@@ -7,7 +7,7 @@ import tester.QuotaExceededException;
 
 import java.util.Random;
 
-public class TestTaskImpl implements ITestTask {
+public final class TestTaskImpl implements ITestTask {
     public static final int MAX_RANDOM_NUMBER = 999;
 
     @Inject

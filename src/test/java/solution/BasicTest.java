@@ -2,7 +2,6 @@ package solution;
 
 import org.junit.Before;
 import solution.config.ApplicationContext;
-import solution.dao.QuotasDAO;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,10 +17,10 @@ public class BasicTest {
     }
 
     protected void clearStorage() {
-        QuotasDAO b = ApplicationContext.getInstance().getInstance(QuotasDAO.class);
-        logger.fine("Clearing storage...");
-        b.clearUserQuotas();
-        logger.fine("Finished clearing storage...");
+//        QuotasDAO b = ApplicationContext.getInstance().getInstance(QuotasDAO.class);
+//        logger.fine("Clearing storage...");
+//        b.clearUserQuotas();
+//        logger.fine("Finished clearing storage...");
     }
 
     private volatile long methodStartTime;

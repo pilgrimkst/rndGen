@@ -3,9 +3,7 @@ package solution;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
-import solution.dao.QuotasDAO;
 import tester.ITestTask;
 import tester.QuotaExceededException;
 
@@ -22,8 +20,6 @@ public class TestTaskImplTest extends BasicTest{
     public static final int WAIT_TO_SYNC = 1000;
     @Inject
     private Logger logger;
-    @Inject
-    private QuotasDAO quotasDAO;
 
     @Inject private ITestTask iTestTask;
 
@@ -76,16 +72,22 @@ public class TestTaskImplTest extends BasicTest{
     }
 
     @Test
+    public void testCreateUserWithQuota() throws Exception{
+        int userId = 5;
+        int newUserQuota = 15;
+        createTestUserWithQuota(userId,newUserQuota);
+        assertThat(iTestTask.getQuota(userId)).isEqualTo(newUserQuota);
+        createTestUserWithQuota(6,3);
+        assertThat(iTestTask.getQuota(6)).isEqualTo(3);
+
+    }
+
+    @Test
     public void testGetQuota() throws Exception {
        int existingUserId = 4;
        long existingUserQuota = 100l;
        createTestUserWithQuota(existingUserId,existingUserQuota);
        assertThat(iTestTask.getQuota(existingUserId)).isEqualTo(existingUserQuota);
-    }
-    @Ignore
-    @Test
-    public void testDestroy() throws Exception {
-
     }
 
     @Test
@@ -118,15 +120,9 @@ public class TestTaskImplTest extends BasicTest{
         }
     }
 
-    private void createTestUserWithQuota(int userId, long quota) {
-        assertThat(createdUserQuotas).doesNotContain(userId);
-        assertThat(quotasDAO.getQuota(userId)).isNull();
-        quotasDAO.incrQuota(userId, quota);
-        registerNewUser(userId);
-    }
-
-    private boolean registerNewUser(int userId) {
-        return createdUserQuotas.add(userId);
+    private void createTestUserWithQuota(int userId, long newQuota) {
+        long userQuota = iTestTask.getQuota(userId);
+        iTestTask.addQuota(userId, -1*(userQuota - newQuota));
     }
 
     private void assertQuotaExceededOnAddQuota(int userId, int incrementBy) {
