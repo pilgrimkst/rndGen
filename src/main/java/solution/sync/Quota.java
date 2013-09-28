@@ -1,20 +1,26 @@
 package solution.sync;
 
 public class Quota {
-    public final long[] data ;
+    private final long quota;
+    private final long delta;
+    private final long remainingQuota;
+
     public Quota(long quota, long delta) {
-        this.data = new long[]{quota,delta, quota+delta};
+        this.quota = quota;
+        this.delta = delta;
+        remainingQuota = quota+delta;
+
+    }
+
+    public long getQuota() {
+        return quota;
+    }
+
+    public long getDelta() {
+        return delta;
     }
 
     public long getRemainingQuota() {
-        return data[2];
+        return remainingQuota;
     }
-
-    public long getDelta(){
-        return data[1];
-    }
-    public long getQuota(){
-        return data[0];
-    }
-
 }
